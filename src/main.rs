@@ -11,6 +11,7 @@ use logos::Logos;
 use std::fmt;
 
 #[derive(Logos, Clone, PartialEq)]
+#[logos(skip r"[ \t\r\n]+")]
 enum Token<'a> {
     Error,
 
@@ -30,9 +31,6 @@ enum Token<'a> {
     LParen,
     #[token(")")]
     RParen,
-
-    #[regex(r"[ \t\f\n]+", logos::skip)]
-    Whitespace,
 }
 
 impl<'a> fmt::Display for Token<'a> {
@@ -45,7 +43,6 @@ impl<'a> fmt::Display for Token<'a> {
             Self::Div => write!(f, "/"),
             Self::LParen => write!(f, "("),
             Self::RParen => write!(f, ")"),
-            Self::Whitespace => write!(f, "<whitespace>"),
             Self::Error => write!(f, "<error>"),
         }
     }
@@ -126,6 +123,8 @@ const SRC: &str = r"
 ";
 
 fn main() {
+    println!("{}", SRC);
+
     // Create a logos lexer over the source code
     let token_iter = Token::lexer(SRC)
         .spanned()
@@ -147,7 +146,7 @@ fn main() {
     // Parse the token stream with our chumsky parser
     match parser().parse(token_stream).into_result() {
         // If parsing was successful, attempt to evaluate the s-expression
-        Ok(sexpr) => match sexpr.eval() {
+        Ok(sexpr) => match dbg!(sexpr).eval() {
             Ok(out) => println!("Result = {}", out),
             Err(err) => println!("Runtime error: {}", err),
         },
