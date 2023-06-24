@@ -92,7 +92,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "regex-syntax",
- "syn",
+ "syn 2.0.18",
 ]
 
 [[package]]
@@ -102,6 +102,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dbfc0d229f1f42d790440136d941afd806bc9e949e2bcb8faa813b0f00d1267e"
 dependencies = [
  "logos-codegen",
+]
+
+[[package]]
+name = "makeit"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e6d75eb3bf9691ac5eeb3f11e69ad05e18422ea00416aaf3f23ceae2ce08e0f"
+dependencies = [
+ "makeit-derive",
+]
+
+[[package]]
+name = "makeit-derive"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0775245ef547103d28b224b7e5f3be8c0d960b39ffbb8cb4a11fb5c17824e23c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -150,6 +170,7 @@ dependencies = [
  "ariadne",
  "chumsky",
  "logos",
+ "makeit",
 ]
 
 [[package]]
@@ -163,6 +184,17 @@ dependencies = [
  "libc",
  "psm",
  "winapi",
+]
+
+[[package]]
+name = "syn"
+version = "1.0.109"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
 ]
 
 [[package]]
