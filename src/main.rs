@@ -10,13 +10,13 @@ use chumsky::{
 use logos::Logos;
 use std::fmt;
 
-#[derive(Logos, Clone, PartialEq)]
+#[derive(Logos, Debug, Clone, PartialEq)]
 #[logos(skip r"[ \t\r\n]+")]
-enum Token<'a> {
+enum Token {
     Error,
 
-    #[regex(r"[+-]?([0-9]*[.])?[0-9]+")]
-    Float(&'a str),
+    #[regex(r"[+-]?([0-9]*[.])?[0-9]+", |lex| lex.slice().parse().ok())]
+    Float(f64),
 
     #[token("+")]
     Add,
@@ -33,7 +33,7 @@ enum Token<'a> {
     RParen,
 }
 
-impl<'a> fmt::Display for Token<'a> {
+impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Float(s) => write!(f, "{}", s),
@@ -49,13 +49,9 @@ impl<'a> fmt::Display for Token<'a> {
 }
 
 #[derive(Debug)]
-enum SExpr {
-    Float(f64),
-    Add,
-    Sub,
-    Mul,
-    Div,
-    List(Vec<Self>),
+enum TokenTree {
+    Token(Token),
+    Parens(Vec<Self>),
 }
 
 // This function signature looks complicated, but don't fear! We're just saying that this function is generic over
@@ -68,48 +64,47 @@ enum SExpr {
 //     - Has an input type of type `I`, the one we declared as a type parameter
 //     - Produces an `SExpr` as its output
 //     - Uses `Rich`, a built-in error type provided by chumsky, for error generation
-fn parser<'a, I>() -> impl Parser<'a, I, SExpr, extra::Err<Rich<'a, Token<'a>>>>
+fn parser<'a, I>() -> impl Parser<'a, I, TokenTree, extra::Err<Rich<'a, Token>>>
 where
-    I: ValueInput<'a, Token = Token<'a>, Span = SimpleSpan>,
+    I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
     recursive(|sexpr| {
         let atom = select! {
-            Token::Float(x) => SExpr::Float(x.parse().unwrap()),
-            Token::Add => SExpr::Add,
-            Token::Sub => SExpr::Sub,
-            Token::Mul => SExpr::Mul,
-            Token::Div => SExpr::Div,
+            Token::Float(x) => TokenTree::Token(Token::Float(x)),
+            Token::Add => TokenTree::Token(Token::Add),
+            Token::Sub => TokenTree::Token(Token::Sub),
+            Token::Mul => TokenTree::Token(Token::Mul),
+            Token::Div => TokenTree::Token(Token::Div),
         };
 
         let list = sexpr
             .repeated()
             .collect()
-            .map(SExpr::List)
+            .map(TokenTree::Parens)
             .delimited_by(just(Token::LParen), just(Token::RParen));
 
         atom.or(list)
     })
 }
 
-impl SExpr {
+impl TokenTree {
     // Recursively evaluate an s-expression
-    fn eval(&self) -> Result<f64, &'static str> {
+    fn eval(&self) -> Result<f64, String> {
         match self {
-            Self::Float(x) => Ok(*x),
-            Self::Add => Err("Cannot evaluate operator '+'"),
-            Self::Sub => Err("Cannot evaluate operator '-'"),
-            Self::Mul => Err("Cannot evaluate operator '*'"),
-            Self::Div => Err("Cannot evaluate operator '/'"),
-            Self::List(list) => match &list[..] {
-                [Self::Add, tail @ ..] => tail.iter().map(SExpr::eval).sum(),
-                [Self::Mul, tail @ ..] => tail.iter().map(SExpr::eval).product(),
-                [Self::Sub, init, tail @ ..] => {
-                    Ok(init.eval()? - tail.iter().map(SExpr::eval).sum::<Result<f64, _>>()?)
+            Self::Token(Token::Float(x)) => Ok(*x),
+            Self::Token(x) => Err(format!("Cannot evaluate operator {:?}", x)),
+            Self::Parens(list) => match &list[..] {
+                [Self::Token(Token::Add), tail @ ..] => tail.iter().map(TokenTree::eval).sum(),
+                [Self::Token(Token::Mul), tail @ ..] => tail.iter().map(TokenTree::eval).product(),
+                [Self::Token(Token::Sub), init, tail @ ..] => {
+                    Ok(init.eval()? - tail.iter().map(TokenTree::eval).sum::<Result<f64, _>>()?)
                 }
-                [Self::Div, init, tail @ ..] => {
-                    Ok(init.eval()? / tail.iter().map(SExpr::eval).product::<Result<f64, _>>()?)
-                }
-                _ => Err("Cannot evaluate list"),
+                [Self::Token(Token::Div), init, tail @ ..] => Ok(init.eval()?
+                    / tail
+                        .iter()
+                        .map(TokenTree::eval)
+                        .product::<Result<f64, _>>()?),
+                _ => Err("Cannot evaluate list".to_owned()),
             },
         }
     }
